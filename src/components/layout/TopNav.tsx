@@ -20,7 +20,12 @@ function initials(name: string | null, email: string): string {
   return email.slice(0, 2).toUpperCase();
 }
 
-export default function TopNav() {
+interface Props {
+  /** Opens the assistant drawer, which AppLayout owns. */
+  onOpenAssistant: () => void;
+}
+
+export default function TopNav({ onOpenAssistant }: Props) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -81,13 +86,14 @@ export default function TopNav() {
 
         {/* Right-side actions */}
         <div className="ml-auto flex items-center gap-4 text-white/80">
-          {/* Global search lands with the Q&A assistant, which subsumes it: one box that
-              answers questions as well as finding records, over the same cross-entity
-              index. Per-page keyword search (listings grid, deal board) is already live. */}
+          {/* Global search is the assistant, which subsumes it: one box that answers
+              questions as well as finding records, over the same cross-entity index.
+              Per-page keyword search (listings grid, deal board) remains separate. */}
           <button
             type="button"
-            aria-label="Search"
-            title="Coming soon"
+            onClick={onOpenAssistant}
+            aria-label="Ask the assistant"
+            title="Ask the assistant (⌘K)"
             className="grid h-8 w-8 place-items-center rounded-full hover:bg-white/10"
           >
             <SearchIcon />

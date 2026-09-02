@@ -101,13 +101,15 @@ interface RequestOptions {
   signal?: AbortSignal;
   /** Skip the bearer header + refresh interceptor (for login/refresh themselves). */
   skipAuth?: boolean;
+  /** Overrides the Accept header. Only the SSE path needs this. */
+  accept?: string;
 }
 
 async function request(path: string, opts: RequestOptions = {}): Promise<Response> {
-  const { method = "GET", body, signal, skipAuth = false } = opts;
+  const { method = "GET", body, signal, skipAuth = false, accept = "application/json" } = opts;
 
   const doFetch = (): Promise<Response> => {
-    const headers: Record<string, string> = { Accept: "application/json" };
+    const headers: Record<string, string> = { Accept: accept };
     if (body !== undefined) headers["Content-Type"] = "application/json";
     if (!skipAuth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
     return fetch(path, {
@@ -129,6 +131,94 @@ async function request(path: string, opts: RequestOptions = {}): Promise<Respons
     }
   }
   return res;
+}
+
+// --- Server-Sent Events -----------------------------------------------------
+
+/** One decoded SSE frame: the `event:` name and its parsed `data:` payload. */
+export interface SseFrame {
+  event: string;
+  data: unknown;
+}
+
+/**
+ * POSTs a body and streams the Server-Sent Events response, invoking `onEvent` per
+ * frame as it arrives.
+ *
+ * Goes through the same `request()` as everything else, which is the point: it inherits
+ * the 401 -> refresh -> retry interceptor for free. `EventSource` cannot be used here at
+ * all — it has no way to set an Authorization header, and the access token deliberately
+ * lives only in memory.
+ *
+ * Errors arrive by two different routes, because the server cannot change its mind after
+ * the first byte. A failure *before* the stream opens is an ordinary non-200 with the
+ * `{ error }` envelope, and throws `ApiError` like any other call. A failure *after* is a
+ * frame named "error", handed to `onEvent` like any other — by then the 200 is long gone.
+ */
+export async function streamSse(
+  path: string,
+  body: unknown,
+  opts: { signal?: AbortSignal; onEvent: (frame: SseFrame) => void }
+): Promise<void> {
+  const res = await request(path, {
+    method: "POST",
+    body,
+    signal: opts.signal,
+    accept: "text/event-stream",
+  });
+
+  // Must happen before the body is touched: a pre-stream failure is JSON, not a stream.
+  if (!res.ok) throw await toError(res);
+  if (!res.body) throw new ApiError(res.status, "The server returned no response body.");
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      // Network chunks have nothing to do with frame boundaries — a single read can end
+      // mid-JSON, or carry three frames at once. Only complete frames (terminated by a
+      // blank line) are parsed; the remainder stays buffered for the next read. Getting
+      // this wrong looks like events being dropped at random under load.
+      buffer += decoder.decode(value, { stream: true });
+
+      let boundary = buffer.indexOf("\n\n");
+      while (boundary !== -1) {
+        const frame = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        const parsed = parseFrame(frame);
+        if (parsed) opts.onEvent(parsed);
+        boundary = buffer.indexOf("\n\n");
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function parseFrame(frame: string): SseFrame | null {
+  let event = "message";
+  const dataLines: string[] = [];
+
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    // A data field cannot span lines, so a multi-line payload arrives as several
+    // `data:` fields that the spec says to rejoin with newlines.
+    else if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""));
+  }
+
+  if (dataLines.length === 0) return null;
+
+  try {
+    return { event, data: JSON.parse(dataLines.join("\n")) };
+  } catch {
+    // A frame we can't parse is not worth killing a running answer over.
+    return null;
+  }
 }
 
 // --- Plain helpers (listings-service returns un-enveloped JSON) --------------
