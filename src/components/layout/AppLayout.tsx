@@ -11,7 +11,7 @@ export default function AppLayout() {
   // The assistant lives here rather than inside the drawer so the conversation outlives
   // both closing the panel and navigating: a citation chip can route to a deal page
   // without discarding the answer that produced it.
-  const { exchanges, streaming, ask, reset } = useAssistant();
+  const { exchanges, streaming, ask, reset, stop } = useAssistant();
 
   const openAssistant = useCallback(() => setAssistantOpen(true), []);
 
@@ -55,6 +55,7 @@ export default function AppLayout() {
         streaming={streaming}
         onAsk={askAndOpen}
         onReset={reset}
+        onStop={stop}
       />
     </div>
   );

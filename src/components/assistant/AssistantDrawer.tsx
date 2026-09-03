@@ -9,12 +9,13 @@ interface Props {
   streaming: boolean;
   onAsk: (question: string) => void;
   onReset: () => void;
+  onStop: () => void;
 }
 
 const SUGGESTIONS = [
   "How many deals are in underwriting?",
   "Which industrial deals are stalling, and what do their documents say?",
-  "Show me retail deals in Denver with overdue tasks",
+  "Show me retail deals in Austin with overdue tasks",
 ];
 
 /**
@@ -32,6 +33,7 @@ export default function AssistantDrawer({
   streaming,
   onAsk,
   onReset,
+  onStop,
 }: Props) {
   const [question, setQuestion] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -149,13 +151,23 @@ export default function AssistantDrawer({
           <p className="text-[11px] text-slate-400">
             {streaming ? "Working — this can take a minute." : "Enter to send"}
           </p>
-          <button
-            type="submit"
-            disabled={!question.trim() || streaming}
-            className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
-          >
-            Ask
-          </button>
+          {streaming ? (
+            <button
+              type="button"
+              onClick={onStop}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Stop
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!question.trim()}
+              className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+            >
+              Ask
+            </button>
+          )}
         </div>
       </form>
     </aside>

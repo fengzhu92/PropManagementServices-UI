@@ -134,7 +134,13 @@ export function useAssistant(context?: { dealId?: string; documentId?: string })
     setStreaming(false);
   }, []);
 
-  return { exchanges, streaming, ask, reset };
+  // Aborts the in-flight question only, keeping the partial answer and prior history —
+  // unlike reset(), which throws the whole conversation away.
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
+  return { exchanges, streaming, ask, reset, stop };
 }
 
 /**
