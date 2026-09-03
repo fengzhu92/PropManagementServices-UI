@@ -14,8 +14,8 @@ interface Props {
 
 const SUGGESTIONS = [
   "How many deals are in underwriting?",
-  "Which industrial deals are stalling, and what do their documents say?",
   "Show me retail deals in Austin with overdue tasks",
+  "Which deal(s) in NDA / LOI has site visit report?",
 ];
 
 /**
@@ -94,11 +94,12 @@ export default function AssistantDrawer({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close assistant"
+            aria-label="Minimize assistant"
+            title="Minimize — your question keeps running"
             className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 6 6 18M6 6l12 12" />
+              <path d="M5 19h14" />
             </svg>
           </button>
         </div>
